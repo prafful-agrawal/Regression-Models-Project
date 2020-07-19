@@ -1,0 +1,210 @@
+---
+title: "Regression-Models-Project"
+author: "Prafful Agrawal"
+date: "July 16, 2020"
+output:
+  html_document:
+    keep_md: yes
+  pdf_document: default
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE)
+```
+
+
+## Executive Summary
+
+In this project we explore the **`mtcars`** data in the **`datasets`** package and establish the relationship between a set of variables and the fuel consumption in *Miles per Gallon* (**MPG**) as *outcome*. In particuar, we try to answer the following two questions:
+
+1. *Is an automatic or manual transmission better for MPG?*
+2. *Can we quantify the MPG difference between automatic and manual transmissions.* 
+
+For answering the above questions, we fit a *linear regression curve* between the outcome **`mpg`** and the predictor **`am`**. We also consider the effect of other variables by using *multivariable regression analysis*. Then, we perform *model selection* to pick the most appropriate model that captures the above relationship.
+
+The results indicate that the **Manual Transmission** is better for the **MPG** as compared to **Automatic Transmission** by about **2.08 MPG** (keeping the other variables constant). But, the results are **NOT** significant to ascertain that.
+
+
+## Exploratory Data Analysis
+
+```{r packages}
+library(ggplot2)
+library(dplyr)
+```
+
+```{r data}
+library(datasets)
+data("mtcars")
+```
+
+The data was extracted from the 1974 *Motor Trend* US magazine, and comprises fuel consumption and 10 aspects of automobile design and performance for 32 automobiles (1973–74 models).
+
+The variables are:
+
+1. **mpg** - Miles/(US) gallon
+2. **cyl** - Number of cylinders
+3. **disp** - Displacement (cu.in.)
+4. **hp** - Gross horsepower
+5. **drat** - Rear axle ratio
+6. **wt** - Weight (1000 lbs)
+7. **qsec** - 1/4 mile time
+8. **vs** - Engine (0 = V-shaped, 1 = straight)
+9. **am** - Transmission (0 = automatic, 1 = manual)
+10. **gear** - Number of forward gears
+11. **carb** - Number of carburetors
+
+Let us look at the structure of the dataset after some preprocessing.
+
+```{r, preprocessing}
+mtcars <- within(mtcars, {vs <- factor(vs, labels = c("V", "S"))
+                          am <- factor(am, labels = c("automatic", "manual"))
+                          cyl  <- ordered(cyl)
+                          gear <- ordered(gear)
+                          carb <- ordered(carb)})
+```
+
+```{r structure}
+str(mtcars)
+```
+
+Considering the variables of interest, i.e. the **`mpg`** and **`am`**, we plot a boxplot to study the distribution of the data.
+
+```{r Plot-01, cache=TRUE, fig.height=4, fig.width=3}
+g <- mtcars %>%
+      ggplot(aes(am, mpg)) +
+        geom_boxplot(aes(fill = am)) +
+        geom_jitter(aes(pch = am)) +
+        scale_fill_discrete(name = "Transmission") +
+        scale_shape_discrete(name = "Transmission") +
+        labs(title = "Boxplot of Fuel consumption\nvs Transmission",
+             x = "Transmission",
+             y = "Fuel consumption (MPG)") +
+        theme(legend.justification = c(0,1), legend.position = c(0,1))
+
+print(g)
+```
+
+From the above plot, the *manual* transmission appears to be better with respect to fuel consumption. Let us continue with *multivariable regression analysis*.
+
+
+## Multivariable Regression Analysis
+
+Initially, set the **seed** for reproducibiliity.
+
+```{r seed}
+set.seed(123)
+```
+
+Let us first fit a *simple linear regression model* considering only **`mpg`** and **`am`** variables.
+
+```{r slr}
+fit_slr <- lm(mpg ~ am, data = mtcars)
+summary(fit_slr)$coefficients
+```
+
+Though, this model gives similar results as that from the *exploratory data analysis*, we are unable to confidently say that the model captures the complete relationship since there may be other variables which explain the variability in the data.
+
+Therefore, we proceed with **Nested** *multivariable regression models*. The models are nested with the consideration of the *correlation* between the different variables and the variable **`am`** and also some common knowledge inferences about the motor vehicle performance.
+
+```{r nested}
+fit_01 <- lm(mpg ~ am, data = mtcars)
+fit_02 <- update(fit_slr, mpg ~ am + wt)
+fit_03 <- update(fit_slr, mpg ~ am + wt + hp)
+fit_04 <- update(fit_slr, mpg ~ am + wt + hp + qsec)
+fit_05 <- update(fit_slr, mpg ~ am + wt + hp + qsec + disp)
+fit_06 <- update(fit_slr, mpg ~ am + wt + hp + qsec + disp + cyl)
+fit_07 <- update(fit_slr, mpg ~ am + wt + hp + qsec + disp + cyl + vs)
+fit_08 <- update(fit_slr, mpg ~ am + wt + hp + qsec + disp + cyl + vs + drat)
+fit_09 <- update(fit_slr, mpg ~ am + wt + hp + qsec + disp + cyl + vs + drat + gear)
+fit_10 <- update(fit_slr, mpg ~ am + wt + hp + qsec + disp + cyl + vs + drat + gear + carb)
+```
+
+We will perform *ANOVA* analysis for model selection.
+
+```{r anova}
+anova(fit_01, fit_02, fit_03, fit_04, fit_05, fit_06, fit_07, fit_08, fit_09, fit_10)
+```
+
+From the above results, we observe that the **RSS** value continuously *decreases* with the inclusion of more variables. But, from the **p-value** of the **F-statistic**, we can say that only till the **3rd** model there is any significance (for *5% confidence level*).
+
+Hence, **`Model_03`** is choosen as the appropriate model.
+
+
+## Results
+
+Let us look at the coefficients from the **3rd** model.
+
+```{r coefficients}
+summary(fit_03)$coefficients
+```
+
+This result again indicates that the **manual** transmission is better than the **automatic** with respect to fuel consumption (about **2.08 MPG** greater keeping other variables as constant). But, the **p-value** of the **T-statistic** is not significant (*p = 0.14* vs *5% confidence*). Hence, we can **NOT** say with certainity.
+
+
+## Appendix
+
+1. Boxplot of Fuel consumption vs Transmission.
+
+```{r appendix-01, cache=TRUE, fig.height=4, fig.width=3}
+g <- mtcars %>%
+      ggplot(aes(am, mpg)) +
+        geom_boxplot(aes(fill = am)) +
+        geom_jitter(aes(pch = am)) +
+        scale_fill_discrete(name = "Transmission") +
+        scale_shape_discrete(name = "Transmission") +
+        labs(title = "Boxplot of Fuel consumption\nvs Transmission",
+             x = "Transmission",
+             y = "Fuel consumption (MPG)") +
+        theme(legend.justification = c(0,1), legend.position = c(0,1))
+
+print(g)
+```
+
+2. Plot of Fitted values vs Actual values for **`fit_slr`**.
+
+```{r appendix-02, cache=TRUE, fig.height=3, fig.width=4}
+q1 <- qplot(mtcars$mpg, fit_slr$fitted.values) +
+        geom_abline(intercept = 0, slope = 1) +
+        labs(title = "Plot of Fitted values vs Actual values\nfor fit_slr",
+             x = "Actual values (MPG)",
+             y = "Fitted values (MPG)")
+
+print(q1)
+```
+
+3. Plot of Fitted values vs Actual values for **`fit_03`**.
+
+```{r appendix-03, cache=TRUE, fig.height=3, fig.width=4}
+q2 <- qplot(mtcars$mpg, fit_03$fitted.values) +
+        geom_abline(intercept = 0, slope = 1) +
+        labs(title = "Plot of Fitted values vs Actual values\nfor fit_03",
+             x = "Actual values (MPG)",
+             y = "Fitted values (MPG)")
+
+print(q2)
+```
+
+4. Plot of Residuals vs Fitted values for **`fit_slr`**.
+
+```{r appendix-04, cache=TRUE, fig.height=3, fig.width=4}
+q3 <- qplot(fit_slr$fitted.values, fit_slr$residuals)  +
+        labs(title = "Plot of Residuals vs Fitted values\nfor fit_slr",
+             x = "Fitted values (MPG)",
+             y = "Residuals (MPG)")
+
+print(q3)
+```
+
+5. Plot of Residuals vs Fitted values for **`fit_03`**.
+
+```{r appendix-05, cache=TRUE, fig.height=3, fig.width=4}
+q4 <- qplot(fit_03$fitted.values, fit_03$residuals)  +
+        labs(title = "Plot of Residuals vs Fitted values\nfor fit_03",
+             x = "Fitted values (MPG)",
+             y = "Residuals (MPG)")
+
+print(q4)
+```
